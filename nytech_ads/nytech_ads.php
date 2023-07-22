@@ -20,7 +20,7 @@ if(!defined('ABSPATH')) {
 function nytech_ads_add_rewrite_rule() {
   add_rewrite_rule(
     '^listings/?([^/]+)/([^/]+)/?$',
-    'index.php?nytech_listing=1&remote_id=$matches[1]&title=$matches[2]',
+    'custom-page/?nytech_listing=1&remote_id=$matches[1]&title=$matches[2]',
     'top'
   );
 }
@@ -37,7 +37,7 @@ add_filter( 'query_vars', 'nytech_ads_register_query_var' );
 
 // Filter the main query to display custom content at the custom path
 function nytech_ads_filter_main_query( $query ) {
-  var_dump($query); exit;
+//  var_dump($query); exit;
 }
 add_action( 'pre_get_posts', 'nytech_ads_filter_main_query' );
 
@@ -55,15 +55,15 @@ add_filter( 'pre_get_document_title', 'nytech_ads_modify_page_title' );
 
 // Render custom content when the custom content query var is set
 function nytech_ads_plugin_render_content() {
-  
+
   if ( get_query_var( 'nytech_listing' ) ) {
     $remote_id = get_query_var( 'remote_id' );
     $data = nytech_ads_get_listings_single($remote_id);
-    var_dump($data);
+//    var_dump($data);
     nytech_listing_single_template($data);
   }
 }
-add_action('template_redirect', 'nytech_ads_plugin_render_content');
+//add_action('template_redirect', 'nytech_ads_plugin_render_content');
 // Add custom meta boxes for the custom fields
 function nytech_ads_add_custom_meta_boxes() {
   add_meta_box(
@@ -85,9 +85,9 @@ function nytech_ads_render_custom_fields($post) {
   ?>
   <label for="nytech_remote_id">Remote ID:</label>
   <input type="text" id="nytech_remote_id" name="nytech_remote_id" value="<?php echo esc_attr($remote_id); ?>" style="width:100%;" />
-  
+
   <br />
-  
+
   <label for="nytech_status">Status:</label>
   <input type="text" id="nytech_status" name="nytech_status" value="<?php echo esc_attr($status); ?>" style="width:100%;" />
   <?php
@@ -165,7 +165,7 @@ function nytech_ads_shortcode_listing_single($ad_id, $atts = false) {
     'nytech_ads_id' => '',
     'nytech_ads_title' => ''
   ), $atts));
-  
+
   // Output the values of the URL variables
   nytech_listing_single_template($data);
   return ob_get_clean(); // Return the buffered content
@@ -346,18 +346,18 @@ class NyTechAPIStatus {
   public $status;
   public $url;
   public $options;
-  
+
   function __construct() {
     $this->settings();
     $this->url();
   }
-  
+
   private function settings() {
     $this->options = get_option('nytech_ads_options');
     $this->status = isset($this->options['nytech_ads_status']) ? esc_attr($this->options['nytech_ads_status']) : '';
-    
+
   }
-  
+
   private function url() {
     switch($this->status) {
       case 'live':
@@ -383,7 +383,7 @@ class NyTechCleanUrl {
     $this->string = $string;
     $this->clean($string);
   }
-  
+
   function clean($string, $separator = '-') {
     $string = preg_replace('![^' . preg_quote($separator) . '\pL\pN\s]+!u', '', strtolower($string));
     $string = preg_replace('![' . preg_quote($separator) . '\s]+!u', $separator, $string);
@@ -402,3 +402,56 @@ function nytech_ads_load_custom_templates($template) {
   return $template;
 }
 add_filter('single_template', 'nytech_ads_load_custom_templates');
+
+// Register the custom page template
+function nytech_ads_register_custom_page() {
+    $page_template = 'nytech-ads-template.php'; // Change this to your actual template file name
+    $page_slug = 'my-ads'; // Change this to your desired page slug
+
+    $page_check = get_page_by_path($page_slug);
+
+    if (!$page_check) {
+        $page_data = array(
+            'post_type'     => 'page',
+            'post_name'     => $page_slug,
+            'post_title'    => 'Listings',
+            'post_status'   => 'publish',
+            'post_content'  => '',
+            'post_author'   => 1,
+            'page_template' => $page_template,
+        );
+
+        wp_insert_post($page_data);
+    }
+}
+
+register_activation_hook(__FILE__, 'nytech_ads_register_custom_page');
+
+// Register the custom page template
+function nytech_ads_register_custom_template($templates) {
+    $templates[plugin_dir_path(__FILE__) . 'templates/nytech-ads-template.php'] = 'Nytech Ads Template';
+    return $templates;
+}
+
+add_filter('theme_page_templates', 'nytech_ads_register_custom_template');
+
+/**
+ * Change the page template to the selected template on the dropdown
+ *
+ * @param $template
+ *
+ * @return mixed
+ */
+function nytech_ads_change_page_template($template) {
+    if (is_page()) {
+        $meta = get_post_meta(get_the_ID());
+
+        if (!empty($meta['_wp_page_template'][0]) && $meta['_wp_page_template'][0] != $template) {
+            $template = $meta['_wp_page_template'][0];
+        }
+    }
+
+    return $template;
+}
+
+add_filter( 'template_include', 'nytech_ads_change_page_template', 99 );
